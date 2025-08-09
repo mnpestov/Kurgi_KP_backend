@@ -17,14 +17,7 @@ class RowController {
             productWeight = productWeight === '' ? null : parseInt(productWeight)
             countOfProduct = countOfProduct === '' ? null : parseInt(countOfProduct)
             priceOfProduct = priceOfProduct === '' ? null : parseFloat(priceOfProduct)
-            console.log("*******************",product,
-                composition,
-                productWeight,
-                countOfProduct,
-                priceOfProduct,
-                listId,
-                typeOfProduct,"***************");
-            
+
             const row = await Row.create({
                 product,
                 composition,

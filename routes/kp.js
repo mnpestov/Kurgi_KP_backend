@@ -4,6 +4,7 @@ const kpController = require('../controllers/kpController')
 
 router.post('/', kpController.create)
 router.get('/lastKpNumber', kpController.getLastKpNumber)
+router.get('/latest', kpController.getLastFive); 
 router.get('/:id', kpController.getOne)
 router.delete('/:id', kpController.delete);
 

@@ -46,56 +46,101 @@ class KpController {
 
     async getOne(req, res, next) {
         const { id } = req.params;
+
+        // хелперы
+        const trimTime = (t) => (t ? String(t).slice(0, 5) : '');
+        const safeDate = (d) => d || null;
+
         try {
             const kp = await Kp.findOne({
                 where: { kpNumber: id },
                 include: [
                     {
                         model: List,
-                        attributes: ['id', 'startEvent', 'endEvent', 'startTimeStartEvent', 'endTimeStartEvent', 'startTimeEndEvent', 'endTimeEndEvent', 'eventPlace', 'countOfPerson', 'listTitle'],
+                        attributes: [
+                            'id',
+                            'startEvent', 'endEvent',
+                            'startTimeStartEvent', 'endTimeStartEvent',
+                            'startTimeEndEvent', 'endTimeEndEvent',
+                            'eventPlace', 'countOfPerson', 'listTitle'
+                        ],
                         include: [
                             {
                                 model: Row,
-                                attributes: ['id', 'countOfProduct', 'priceOfProduct', 'product', 'composition', 'productWeight', 'typeOfProduct']
+                                attributes: [
+                                    'id',
+                                    'countOfProduct', 'priceOfProduct',
+                                    'product', 'composition', 'productWeight',
+                                    'typeOfProduct'
+                                ]
                             }
                         ]
-                    }
-                ]
+                    },
+                    // Если хочешь получить job/email/tel с бэка — раскомментируй include Manager:
+                    // { model: Manager, attributes: ['role', 'email', 'tel'] }
+                ],
+                // фиксируем порядок списков и строк:
+                order: [
+                    [List, 'id', 'ASC'],
+                    [List, Row, 'id', 'ASC'],
+                ],
             });
 
             if (!kp) {
-                return res.status(404).json({ message: "KP not found" });
+                return res.status(404).json({ message: 'KP not found' });
             }
+
+            // Берём времена из первого листа для formData (как у тебя было),
+            // обрезаем секунды до HH:MM:
+            const firstList = kp.lists && kp.lists[0];
+            const formStartTimeStartEvent = firstList ? trimTime(firstList.startTimeStartEvent) : '';
+            const formEndTimeStartEvent = firstList ? trimTime(firstList.endTimeStartEvent) : '';
+            const formStartTimeEndEvent = firstList ? trimTime(firstList.startTimeEndEvent) : '';
+            const formEndTimeEndEvent = firstList ? trimTime(firstList.endTimeEndEvent) : '';
 
             const formattedResponse = {
                 formData: {
                     id: kp.id,
                     managerName: kp.managerName,
+                    // Если включишь include Manager выше — эти поля придут; иначе на фронте бери из constants/managers
                     managerJobTitle: kp.manager?.role || '',
                     managerEmail: kp.manager?.email || '',
                     managerTel: kp.manager?.tel || '',
-                    managerPhoto: '', // Поле отсутствует в модели Manager
+                    managerPhoto: '',
+
                     kpNumber: kp.kpNumber,
-                    kpDate: kp.kpDate,
+                    kpDate: safeDate(kp.kpDate),
                     contractNumber: kp.contractNumber,
-                    contractDate: kp.contractDate,
-                    startEvent: kp.startEvent,
-                    endEvent: kp.endEvent,
-                    startTime: '', // Уточните источник данных для этого поля
-                    endTime: '', // Уточните источник данных для этого поля
-                    startTimeStartEvent: kp.lists?.[0]?.startTimeStartEvent || '',
-                    endTimeStartEvent: kp.lists?.[0]?.endTimeStartEvent || '',
-                    startTimeEndEvent: kp.lists?.[0]?.startTimeEndEvent || '',
-                    endTimeEndEvent: kp.lists?.[0]?.endTimeEndEvent || '',
+                    contractDate: safeDate(kp.contractDate),
+
+                    startEvent: safeDate(kp.startEvent),
+                    endEvent: safeDate(kp.endEvent),
+
+                    // времена для превью из первого листа (как было) + HH:MM
+                    startTimeStartEvent: formStartTimeStartEvent,
+                    endTimeStartEvent: formEndTimeStartEvent,
+                    startTimeEndEvent: formStartTimeEndEvent,
+                    endTimeEndEvent: formEndTimeEndEvent,
+
                     eventPlace: kp.eventPlace,
                     countOfPerson: kp.countOfPerson,
                     logisticsCost: kp.logisticsCost,
                     isWithinMkad: kp.isWithinMkad,
                     listTitle: kp.listTitle,
                 },
-                listsKp: kp.lists.map(list => ({
+                // также возвращаем детальные данные каждого листа
+                listsKp: kp.lists.map((list) => ({
                     id: list.id,
-                    rows: list.rows.map(row => ({
+                    startEvent: safeDate(list.startEvent),
+                    endEvent: safeDate(list.endEvent),
+                    startTimeStartEvent: trimTime(list.startTimeStartEvent),
+                    endTimeStartEvent: trimTime(list.endTimeStartEvent),
+                    startTimeEndEvent: trimTime(list.startTimeEndEvent),
+                    endTimeEndEvent: trimTime(list.endTimeEndEvent),
+                    eventPlace: list.eventPlace,
+                    countOfPerson: list.countOfPerson,
+                    listTitle: list.listTitle,
+                    rows: (list.rows || []).map((row) => ({
                         id: row.id,
                         countOfProduct: row.countOfProduct,
                         priceOfProduct: row.priceOfProduct,
@@ -103,8 +148,8 @@ class KpController {
                         composition: row.composition,
                         productWeight: row.productWeight,
                         typeOfProduct: row.typeOfProduct,
-                    }))
-                }))
+                    })),
+                })),
             };
 
             return res.json(formattedResponse);
@@ -112,6 +157,7 @@ class KpController {
             next(ApiError.badRequest(err.message));
         }
     }
+
 
     async getLastKpNumber(req, res, next) {
         try {
@@ -158,6 +204,20 @@ class KpController {
             return res.json({ message: 'КП и все связанные данные удалены' });
         } catch (err) {
             next(ApiError.badRequest(err.message));
+        }
+    }
+
+    async getLastFive(req, res, next) {
+        try {
+            // Запрос последних 5 КП по дате (самые новые)
+            const kps = await Kp.findAll({
+                order: [['kpDate', 'DESC']],
+                limit: 5,
+                attributes: ['id', 'kpNumber', 'kpDate', 'startEvent', 'eventPlace']
+            });
+            return res.json(kps);
+        } catch (err) {
+            next(err);  // обработка ошибки (либо ApiError)
         }
     }
 
