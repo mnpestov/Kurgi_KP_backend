@@ -47,6 +47,7 @@ const Row = sequelize.define('row', {
     countOfProduct: { type: DataTypes.INTEGER, allowNull: false },
     priceOfProduct: { type: DataTypes.INTEGER, allowNull: false },
     typeOfProduct: { type: DataTypes.STRING },
+    order: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
 })
 
 Kp.hasOne(Manager)

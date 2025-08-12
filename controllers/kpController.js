@@ -1,6 +1,7 @@
 const { Kp, Manager, List, Row } = require('../models/models')
 const ApiError = require('../errors/ApiError')
 const { log } = require('console')
+const { literal } = require('sequelize');
 
 class KpController {
     async create(req, res, next) {
@@ -81,8 +82,9 @@ class KpController {
                 ],
                 // фиксируем порядок списков и строк:
                 order: [
-                    [List, 'id', 'ASC'],
-                    [List, Row, 'id', 'ASC'],
+                    [{ model: List, as: 'lists' }, 'id', 'ASC'],
+                    [{ model: List, as: 'lists' }, { model: Row, as: 'rows' }, 'order', 'ASC'],
+                    [{ model: List, as: 'lists' }, { model: Row, as: 'rows' }, 'id', 'ASC'],
                 ],
             });
 
@@ -148,6 +150,7 @@ class KpController {
                         composition: row.composition,
                         productWeight: row.productWeight,
                         typeOfProduct: row.typeOfProduct,
+                        order: row.order,
                     })),
                 })),
             };
@@ -161,20 +164,18 @@ class KpController {
 
     async getLastKpNumber(req, res, next) {
         try {
-            // Находим запись с максимальным kpNumber
-
+            // Сортируем по числовому значению kpNumber
             const lastKp = await Kp.findOne({
-                order: [['kpNumber', 'DESC']], // Сортируем по убыванию
-                attributes: ['kpNumber'], // Выбираем только поле kpNumber
+                attributes: ['kpNumber'],
+                order: [literal(`CAST("kpNumber" AS INTEGER) DESC`)],
             });
 
-            if (!lastKp) {
-                // Если записей нет, возвращаем null или начальное значение
-                return res.json({ kpNumber: null });
-            }
+            // Если записей нет — вернём "0" (фронт добавит +1 и получит "1")
+            const last = lastKp?.kpNumber;
+            const lastNum = Number.parseInt(String(last ?? ''), 10);
+            const safe = Number.isFinite(lastNum) ? String(lastNum) : '0';
 
-            // Возвращаем последний kpNumber
-            return res.json(lastKp.kpNumber);
+            return res.json(safe); // <-- как и прежде, просто строка, например "9"
         } catch (err) {
             next(ApiError.badRequest(err.message));
         }
@@ -220,6 +221,59 @@ class KpController {
             next(err);  // обработка ошибки (либо ApiError)
         }
     }
+
+    async update(req, res, next) {
+        const kpNumber = req.params.kpNumber;
+        let {
+            kpDate,
+            contractNumber,
+            contractDate,
+            startEvent,
+            endEvent,
+            eventPlace,
+            countOfPerson,
+            isWithinMkad,
+            logisticsCost,
+            listTitle,
+            managerName,
+        } = req.body;
+
+        try {
+            // нормализация
+            const normDate = d => (d ? String(d).slice(0, 10) : null); // ожидаем YYYY-MM-DD
+            const normBool = v => (typeof v === 'boolean' ? v : v === 'true');
+            const normStr = v => (v == null ? null : String(v));
+
+            const payload = {
+                // kpNumber — НЕ трогаем, мы апдейтим по нему
+                kpDate: normDate(kpDate),
+                contractNumber: normStr(contractNumber),
+                contractDate: normDate(contractDate),
+                startEvent: normDate(startEvent),
+                endEvent: normDate(endEvent),
+                eventPlace: normStr(eventPlace),
+                countOfPerson: normStr(countOfPerson), // модель ожидает STRING
+                isWithinMkad: normBool(isWithinMkad),
+                logisticsCost: logisticsCost == null ? null : Number(logisticsCost),
+                listTitle: normStr(listTitle),
+                managerName: normStr(managerName),
+            };
+
+            const [updatedCount, [updated]] = await Kp.update(
+                payload,
+                { where: { kpNumber: String(kpNumber) }, returning: true }
+            );
+
+            if (!updatedCount) {
+                return next(ApiError.badRequest('КП с таким номером не найдено'));
+            }
+
+            return res.json({ message: 'КП успешно обновлено', kp: updated });
+        } catch (err) {
+            next(ApiError.badRequest(err.message));
+        }
+    }
+
 
 }
 

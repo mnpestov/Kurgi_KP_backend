@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "dev": "npx nodemon index.js",
-    "start": "node index.js"
+    "start": "node index.js",
+    "migrate": "sequelize-cli db:migrate",
+    "migrate:status": "sequelize-cli db:migrate:status"
   },
   "author": "mnpestov",
   "license": "ISC",
@@ -17,5 +19,8 @@
     "pg": "^8.13.1",
     "sequelize": "^6.37.5"
   },
-  "proxy": "http://localhost:3001/"
+  "proxy": "http://localhost:3001/",
+  "devDependencies": {
+    "sequelize-cli": "^6.6.3"
+  }
 }

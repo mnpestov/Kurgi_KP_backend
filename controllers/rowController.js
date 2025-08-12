@@ -12,7 +12,8 @@ class RowController {
                 countOfProduct,
                 priceOfProduct,
                 listId,
-                typeOfProduct
+                typeOfProduct,
+                order
             } = req.body
             productWeight = productWeight === '' ? null : parseInt(productWeight)
             countOfProduct = countOfProduct === '' ? null : parseInt(countOfProduct)
@@ -25,7 +26,8 @@ class RowController {
                 countOfProduct,
                 priceOfProduct,
                 listId,
-                typeOfProduct
+                typeOfProduct,
+                order: Number.isInteger(order) ? order : 0
             })
 
             return res.json(row)
