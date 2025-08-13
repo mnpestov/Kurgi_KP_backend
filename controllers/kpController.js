@@ -72,8 +72,10 @@ class KpController {
                                     'id',
                                     'countOfProduct', 'priceOfProduct',
                                     'product', 'composition', 'productWeight',
-                                    'typeOfProduct'
-                                ]
+                                    'typeOfProduct', 'order'
+                                ],
+                                separate: true,
+                                order: [['order', 'ASC'], ['id', 'ASC']],
                             }
                         ]
                     },
@@ -83,8 +85,8 @@ class KpController {
                 // фиксируем порядок списков и строк:
                 order: [
                     [{ model: List, as: 'lists' }, 'id', 'ASC'],
-                    [{ model: List, as: 'lists' }, { model: Row, as: 'rows' }, 'order', 'ASC'],
-                    [{ model: List, as: 'lists' }, { model: Row, as: 'rows' }, 'id', 'ASC'],
+                    // [{ model: List, as: 'lists' }, { model: Row, as: 'rows' }, 'order', 'ASC'],
+                    // [{ model: List, as: 'lists' }, { model: Row, as: 'rows' }, 'id', 'ASC'],
                 ],
             });
 
